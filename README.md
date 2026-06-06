@@ -26,13 +26,16 @@ models/skin_cancer_efficientnetb0.keras
    - `models/skin_cancer_efficientnetb0.keras`
 3. Go to Streamlit Community Cloud.
 4. Create a new app from the GitHub repository.
-5. Set the main file path to:
+5. Open **Advanced settings** and set Python to **3.11**. TensorFlow will not install on Python 3.14.
+6. Set the main file path to:
 
 ```text
 app.py
 ```
 
 Note: the model is around 37 MB, which is usually acceptable for GitHub and Streamlit Cloud. If deployment becomes slow, use Git LFS or download the model from a release asset.
+
+If Streamlit Cloud already created the app with Python 3.14, delete the app and redeploy it. Rebooting alone will keep the same Python environment.
 
 ## Optional Gemini Explanation
 
