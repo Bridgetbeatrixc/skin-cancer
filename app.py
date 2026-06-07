@@ -31,7 +31,14 @@ CLASS_DESCRIPTIONS = {
     "vasc": "Vascular lesions",
 }
 
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
+GEMINI_MODEL_CANDIDATES = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",
+]
 
 
 @st.cache_resource
@@ -116,6 +123,49 @@ def get_gemini_api_key() -> str:
     return os.environ.get("GEMINI_API_KEY", secret_key)
 
 
+def get_configured_gemini_model_name() -> str:
+    try:
+        secret_model = st.secrets.get("GEMINI_MODEL_NAME", "")
+    except Exception:
+        secret_model = ""
+
+    return os.environ.get("GEMINI_MODEL_NAME", secret_model)
+
+
+def normalize_gemini_model_name(name: str) -> str:
+    return name.removeprefix("models/")
+
+
+def model_supports_generate_content(model) -> bool:
+    methods = getattr(model, "supported_generation_methods", []) or []
+    return "generateContent" in methods
+
+
+def select_gemini_model(genai) -> str:
+    configured_model = get_configured_gemini_model_name()
+    if configured_model:
+        return normalize_gemini_model_name(configured_model)
+
+    available = [
+        normalize_gemini_model_name(model.name)
+        for model in genai.list_models()
+        if model_supports_generate_content(model)
+    ]
+
+    for candidate in GEMINI_MODEL_CANDIDATES:
+        if candidate in available:
+            return candidate
+
+    for model_name in available:
+        if "flash" in model_name:
+            return model_name
+
+    if available:
+        return available[0]
+
+    raise RuntimeError("No Gemini models supporting generateContent were found for this API key.")
+
+
 def build_context(age, sex, outdoor_exposure, sunscreen_use, occupation, daily_life_notes):
     return {
         "age": age,
@@ -185,7 +235,8 @@ def generate_gemini_explanation(results: pd.DataFrame, context: dict) -> str:
         import google.generativeai as genai
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+        model_name = select_gemini_model(genai)
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(build_gemini_prompt(results, context))
         return response.text
     except Exception as exc:
